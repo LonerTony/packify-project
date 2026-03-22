@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Warehouse Settlement</title>
+<link rel="stylesheet" href="../css/packify.css">
+<img src="../images/Screenshot 2026-03-15 at 8.21.13 PM.png" alt="Packify">
+
+</head>
+
+<body>
+
+    <div class="navbar">
+
+
+
+        <nav class="nav-links">
+        
+            <button><a href="packify.html">Home</a></button>
+            <button><a href="cart.html">Cart</a></button>
+           <button><a href="checkout.html">Checkout</a></button>
+            <button><a href="orders.html">Orders</a></button>
+            
+        </nav>
+        </div>
+
+<h1>Warehouse Settlement</h1>
+
+<form id="settlement-form">
+
+<div class="form-group">
+<label>Order ID</label>
+<input type="text" id="order-id">
+</div>
+
+<div class="form-group">
+<label>Settlement Amount</label>
+<input type="text" id="settlement-amount">
+</div>
+
+<p>Authorized Amount: $<span id="authorized-amount">0.00</span></p>
+
+<p class="message" id="settlement-message"></p>
+
+<button type="submit">Settle Order</button>
+
+</form>
+
+</body>
+</html>
