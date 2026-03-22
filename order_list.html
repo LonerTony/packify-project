@@ -1,0 +1,85 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Order List</title>
+<link rel="stylesheet" href="../css/orders.css">
+<img src="../images/Screenshot 2026-03-15 at 8.21.13 PM.png" alt="Packify">
+
+</head>
+
+<body>
+
+    <div class="navbar">
+
+
+
+        <nav class="nav-links">
+        
+            <button><a href="packify.html">Home</a></button>
+            <button><a href="cart.html">Cart</a></button>
+            <button><a href="checkout.html">Checkout</a></button>
+            <button><a href="warehouse.html">Warehouse</a></button>
+        
+        </nav>
+        </div>
+        
+
+<h1>Orders</h1>
+
+<div class="filter-section">
+
+<label>Status:</label>
+<select id="status-filter">
+<option value="">All</option>
+<option value="authorized">Authorized</option>
+<option value="settled">Settled</option>
+<option value="cancelled">Cancelled</option>
+</select>
+
+<label>Sort By:</label>
+<select id="sort-by">
+<option value="date">Date</option>
+<option value="amount">Amount</option>
+</select>
+
+<button id="apply-filter">Apply</button>
+
+</div>
+
+<table id="orders-table">
+
+<thead>
+<tr>
+<th>Order ID</th>
+<th>Customer Name</th>
+<th>Date</th>
+<th>Amount</th>
+<th>Status</th>
+</tr>
+</thead>
+
+<tbody>
+
+<tr>
+<td>1001</td>
+<td>John Smith</td>
+<td>2026-03-01</td>
+<td>$60.00</td>
+<td>Authorized</td>
+</tr>
+
+<tr>
+<td>1002</td>
+<td>Jane Doe</td>
+<td>2026-03-02</td>
+<td>$75.00</td>
+<td>Settled</td>
+</tr>
+
+</tbody>
+</table>
+
+</body>
+</html>
