@@ -48,9 +48,17 @@ button:hover {
     justify-content: center;
     padding: 15px;
     margin: 20px 0;
+    border-radius: 5px;
+    border: 8px black;
 
 
 }
+
+nav a:hover {
+    background-color:#99bf9d;
+    color:black;
+    
+}	
 
 .nav-links a{
 
@@ -60,6 +68,8 @@ button:hover {
     margin:0 10px;
     background:none;
     color:black;
+    border-radius: 5px;
+    background-color: white;
    
 
 }
@@ -89,3 +99,4 @@ button:hover {
     }
 
 }
+    
