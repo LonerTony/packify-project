@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Checkout</title>
+<link rel="stylesheet" href="../css/checkout.css">
+<img src="../images/Screenshot 2026-03-15 at 8.21.13 PM.png" alt="Packify">
+</head>
+
+
+<body>
+
+
+    <div class="navbar">
+
+
+
+        <nav class="nav-links">
+        
+        
+           <button><a href="packify.html">Home</a></button>
+           <button><a href="cart.html">Cart</a></button>
+            <button><a href="orders.html">Orders</a></button>
+            <button><a href="warehouse.html">Warehouse</a></button>
+        
+        </nav>
+        </div>
+        <br>
+
+        <h1>Checkout</h1>
+
+        <!-- CART SUMMARY -->
+
+<div class="cart">
+
+    <h3>Order Summary</h3>
+    
+    <div id="cart-items"></div>
+    
+    <div class="total">
+    Subtotal: $<span id="cart-subtotal">0.00</span>
+    </div>
+    
+    <div>
+    Tax: $<span id="cart-tax">0.00</span>
+    </div>
+    
+    <div class="total">
+    Total: $<span id="cart-total">0.00</span>
+    </div>
+</div>
+    <br>
+    
+    
+    <form id="checkout-form" action="/checkout" method="POST">
+    
+    <div class="form-group">
+    <label>First Name</label>
+    <input type="text" name="first_name" id="first-name">
+    </div>
+    <br>
+    
+    <div class="form-group">
+    <label>Last Name</label>
+    <input type="text" name="last_name" id="last-name">
+    </div>
+    <br>
+    
+    <div class="form-group">
+    <label>Address</label>
+    <input type="text" name="address" id="address">
+    </div>
+    <br>
+    
+    <h2>Payment Information</h2>
+    
+    <div class="form-group">
+    <label>Card Number</label>
+    <input type="text" name="card_number" id="card-number">
+    <span class="error" id="card-error"></span>
+    </div>
+    <br>
+    
+    <div class="form-group">
+    <label>Expiration Month</label>
+    <input type="text" name="exp_month" id="exp-month">
+    </div>
+    <br>
+
+    <div class="form-group">
+    <label>Expiration Year</label>
+    <input type="text" name="exp_year" id="exp-year">
+    </div>
+    <br>
+    
+    <div class="form-group">
+    <label>CVV</label>
+    <input type="text" name="cvv" id="cvv">
+    <span class="error" id="cvv-error"></span>
+    </div>
+    <br>
+    
+    <div class="form-group">
+    <label>ZIP Code</label>
+    <input type="text" name="zip" id="zip">
+    </div>
+    <br>
+    
+   
+    <button type="submit">Submit Order</button>
+  
+
+
+
+    </form>
+    
+    <div class="order-summary">
+    
+    <h2>Order Details</h2>
+    
+    <p>Subtotal: $<span id="checkout-subtotal">0.00</span></p>
+    <p>Tax: $<span id="checkout-tax">0.00</span></p>
+    <p><strong>Total: $<span id="checkout-total">0.00</span></strong></p>
+    
+    </div>
