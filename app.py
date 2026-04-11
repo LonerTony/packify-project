@@ -1,469 +1,577 @@
-# app.py
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, Optional
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request
 
-# -----------------------------
-# Optional imports (repo-based)
-# -----------------------------
-try:
-    from database.connection import get_connection  # expected in /database/connection.py
-except Exception:
-    get_connection = None
+from database.connection import get_connection
+from services.payment_service import (
+    PaymentServiceError,
+    authorize_payment,
+    get_oauth_token,
+)
 
-try:
-    from services.payment_service import get_oauth_token, authorize_payment
-except Exception:
-    get_oauth_token = None
-    authorize_payment = None
-
-try:
-    from services.logging_service import log_event
-except Exception:
-    log_event = None
+load_dotenv()
 
 
-# -----------------------------
-# App Setup
-# -----------------------------
-def create_app() -> Flask:
+def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-me")
 
-    # Simple health check
-    @app.get("/health")
-    def health():
-        return {"status": "ok", "time": datetime.utcnow().isoformat()}
+    try:
+        from services.logging_service import log_event as external_log_event
+    except Exception:
+        external_log_event = None
 
-    # -----------------------------
-    # Helpers
-    # -----------------------------
-    def _db():
-        if get_connection is None:
-            raise RuntimeError(
-                "database/connection.py not found or get_connection() not importable."
-            )
-        return get_connection()
-
-    def _log(order_id: Optional[str], event_type: str, message: str) -> None:
-        # Prefer your logging_service.py, fallback to console
-        if log_event:
-            try:
-                log_event(order_id=order_id, event_type=event_type, message=message)
+    def log_event(order_id, event_type, message, level="INFO", metadata=None):
+        try:
+            if external_log_event:
+                external_log_event(
+                    order_id=order_id,
+                    event_type=event_type,
+                    message=message,
+                    level=level,
+                    metadata=metadata,
+                )
                 return
-            except Exception:
-                pass
-        print(f"[{datetime.utcnow().isoformat()}] {event_type} order={order_id} {message}")
 
-    def _new_order_id() -> str:
-        # ORD + 8 chars; ex: ORD12AB34CD
-        return "ORD" + uuid.uuid4().hex[:8].upper()
+            conn = get_connection()
+            cursor = conn.cursor()
 
-    def _to_money(val: Any) -> Decimal:
-        # strict money conversion
-        try:
-            dec = Decimal(str(val)).quantize(Decimal("0.01"))
-            if dec <= 0:
-                raise ValueError("Amount must be > 0")
-            return dec
-        except (InvalidOperation, ValueError) as e:
-            raise ValueError("Invalid amount") from e
-
-    def _card_last4(card_number: str) -> str:
-        digits = "".join(ch for ch in card_number if ch.isdigit())
-        return digits[-4:] if len(digits) >= 4 else "????"
-
-    # -----------------------------
-    # Pages
-    # -----------------------------
-    @app.get("/")
-    def root():
-        return redirect(url_for("products"))
-
-    @app.get("/products")
-    def products():
-        # You can render real products later; this keeps it simple.
-        sample_products = [
-            {"sku": "BP-001", "name": "Packify Trail Backpack", "price": "49.99"},
-            {"sku": "BP-002", "name": "Packify City Backpack", "price": "64.99"},
-            {"sku": "BP-003", "name": "Packify Travel Backpack", "price": "89.99"},
-        ]
-        return render_template("products.html", products=sample_products)
-
-    @app.get("/checkout")
-    def checkout():
-        # A simple checkout page where JS will do validations/masking on the client.
-        # OrderId and total can be generated server-side, or passed from products.
-        order_id = request.args.get("order_id") or _new_order_id()
-        total_amount = request.args.get("total_amount") or "50.00"
-        return render_template("checkout.html", order_id=order_id, total_amount=total_amount)
-
-    # -----------------------------
-    # API: Create order + authorize payment
-    # -----------------------------
-    @app.post("/api/authorize")
-    def api_authorize():
-        """
-        Expects JSON like:
-        {
-          "customer_fname": "...",
-          "customer_lname": "...",
-          "address": "...",
-          "order_id": "ORD123...",
-          "requested_amount": 50.00,
-          "card": {
-              "number": "1111-1111-1111-1111",
-              "month": "08",
-              "year": "2028",
-              "ccv": "111"
-          }
-        }
-
-        IMPORTANT: We do NOT store card number/ccv/month/year in DB (per requirements).
-        """
-        payload = request.get_json(silent=True) or {}
-        order_id = payload.get("order_id") or _new_order_id()
-
-        customer_fname = (payload.get("customer_fname") or "").strip()
-        customer_lname = (payload.get("customer_lname") or "").strip()
-        address = (payload.get("address") or "").strip()
-
-        card = payload.get("card") or {}
-        card_number = (card.get("number") or "").strip()
-        card_month = (card.get("month") or "").strip()
-        card_year = (card.get("year") or "").strip()
-        ccv = (card.get("ccv") or "").strip()
-
-        # Server-side sanity checks (client-side JS does the heavy lifting)
-        if not customer_fname or not customer_lname or not address:
-            return jsonify({"ok": False, "message": "Missing customer information."}), 400
-        if not card_number or not card_month or not card_year or not ccv:
-            return jsonify({"ok": False, "message": "Missing card fields."}), 400
-
-        try:
-            requested_amount = _to_money(payload.get("requested_amount"))
-        except ValueError:
-            return jsonify({"ok": False, "message": "Invalid requested amount."}), 400
-
-        # Save ORDER first (status Pending)
-        try:
-            conn = _db()
-            cur = conn.cursor()
-            cur.execute(
+            cursor.execute(
                 """
-                INSERT INTO orders (order_id, customer_fname, customer_lname, address, total_amount, status, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    customer_fname=VALUES(customer_fname),
-                    customer_lname=VALUES(customer_lname),
-                    address=VALUES(address),
-                    total_amount=VALUES(total_amount)
+                INSERT INTO logs (order_id, event_type, level, message, metadata)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (
+                    order_id,
+                    event_type,
+                    level,
+                    message,
+                    str(metadata) if metadata is not None else None,
+                ),
+            )
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Logging failed: {e}")
+
+    def get_json_payload():
+        return request.get_json(silent=True) or request.form or {}
+
+    def generate_order_id():
+        return f"ORD{uuid.uuid4().hex[:9].upper()}"
+
+    def to_decimal(value, default="0.00"):
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return Decimal(default)
+
+    def parse_auth_expiration(value):
+        if not value:
+            return None
+
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+
+        value = str(value).strip()
+
+        formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%d",
+        ]
+
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(value, fmt)
+                return dt.strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+
+    def fetch_orders(status=None, sort_by="created_at", sort_dir="DESC"):
+        allowed_sort_columns = {
+            "order_id": "o.order_id",
+            "customer": "o.customer_lname",
+            "amount": "o.total_amount",
+            "status": "o.status",
+            "created_at": "o.created_at",
+        }
+
+        sort_column = allowed_sort_columns.get(sort_by, "o.created_at")
+        sort_direction = "ASC" if str(sort_dir).upper() == "ASC" else "DESC"
+
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        query = f"""
+            SELECT
+                o.order_id,
+                o.customer_fname,
+                o.customer_lname,
+                o.address,
+                o.total_amount,
+                o.status,
+                o.created_at,
+                a.authorized_amount,
+                a.response_status,
+                a.auth_expiration
+            FROM orders o
+            LEFT JOIN (
+                SELECT a1.*
+                FROM authorizations a1
+                INNER JOIN (
+                    SELECT order_id, MAX(created_at) AS latest_created
+                    FROM authorizations
+                    GROUP BY order_id
+                ) latest
+                  ON a1.order_id = latest.order_id
+                 AND a1.created_at = latest.latest_created
+            ) a
+              ON o.order_id = a.order_id
+        """
+
+        params = []
+        if status and status.lower() != "all":
+            query += " WHERE o.status = %s"
+            params.append(status)
+
+        query += f" ORDER BY {sort_column} {sort_direction}"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+        return rows
+
+    @app.route("/")
+    def root():
+        return render_template("home.html")
+
+    @app.route("/products")
+    def products():
+        return render_template("products.html")
+
+    @app.route("/cart")
+    def cart():
+        return render_template("cart.html")
+
+    @app.route("/checkout", methods=["GET", "POST"])
+    def checkout():
+        if request.method == "GET":
+            return render_template("checkout.html")
+
+        data = get_json_payload()
+
+        first_name = str(data.get("firstName", "")).strip()
+        last_name = str(data.get("lastName", "")).strip()
+        address = str(data.get("address", "")).strip()
+        zip_code = str(data.get("zip", "")).strip()
+
+        card_number = str(data.get("cardNumber", "")).strip()
+        month = str(data.get("month", "")).strip()
+        year = str(data.get("year", "")).strip()
+        cvv = str(data.get("cvv", "")).strip()
+
+        requested_amount = to_decimal(data.get("amount"), "0.00")
+
+        if not first_name or not last_name:
+            return jsonify({"status": "Error", "message": "First and last name are required."}), 400
+
+        if not address:
+            return jsonify({"status": "Error", "message": "Address is required."}), 400
+
+        if requested_amount <= 0:
+            return jsonify({"status": "Error", "message": "Amount must be greater than zero."}), 400
+
+        order_id = generate_order_id()
+
+        conn = None
+        cursor = None
+
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                INSERT INTO orders (
                     order_id,
                     customer_fname,
                     customer_lname,
                     address,
-                    str(requested_amount),
-                    "Pending",
-                    datetime.utcnow(),
-                ),
-            )
-            conn.commit()
-            _log(order_id, "ORDER_CREATE", f"Order created/updated. amount={requested_amount}")
-        except Exception as e:
-            _log(order_id, "DB_ERROR", f"Failed to save order: {e}")
-            return jsonify({"ok": False, "message": "Database error saving order."}), 500
-        finally:
-            try:
-                cur.close()
-                conn.close()
-            except Exception:
-                pass
-
-        # Call Token API -> then Authorization API (mock endpoints)
-        try:
-            if not get_oauth_token or not authorize_payment:
-                # Fallback response if services not created yet.
-                # Replace by implementing services/payment_service.py.
-                raise RuntimeError("payment_service not implemented")
-
-            _log(order_id, "TOKEN_REQUEST", "Requesting OAuth token...")
-            token = get_oauth_token()  # should call /oauth/token with merchantId/secretKey
-
-            _log(order_id, "AUTH_REQUEST", "Calling authorize endpoint...")
-            auth_resp = authorize_payment(
-                token=token,
-                order_id=order_id,
-                card_number=card_number,
-                card_month=card_month,
-                card_year=card_year,
-                ccv=ccv,
-                requested_amount=float(requested_amount),
-            )
-            # Expected your service returns dict with keys like:
-            # {
-            #   "http_status": 200,
-            #   "status": "Approved" | "Failed" | "Error",
-            #   "authorizationToken": "abc123",
-            #   "authorizedAmount": 50.0,
-            #   "authExpiration": "2028-08-01T00:00:00Z",
-            #   "message": "..."
-            # }
-        except Exception as e:
-            _log(order_id, "PAYMENT_ERROR", f"Payment services unavailable or failed: {e}")
-
-            # Update order to failed-system-error
-            try:
-                conn = _db()
-                cur = conn.cursor()
-                cur.execute("UPDATE orders SET status=%s WHERE order_id=%s", ("Failed – System Error", order_id))
-                conn.commit()
-            except Exception:
-                pass
-            finally:
-                try:
-                    cur.close()
-                    conn.close()
-                except Exception:
-                    pass
-
-            return jsonify(
-                {
-                    "ok": False,
-                    "order_id": order_id,
-                    "message": "Payment service temporarily unavailable. Please try again later.",
-                }
-            ), 502
-
-        # Interpret response & persist authorization attempt
-        response_status = auth_resp.get("status") or "Failed"
-        http_status = int(auth_resp.get("http_status") or 200)
-
-        authorization_token = (auth_resp.get("authorizationToken") or "").strip()
-        authorized_amount = auth_resp.get("authorizedAmount")
-        message = auth_resp.get("message") or ""
-
-        # Per spec: store concatenated token: {OrderId}_{authorization token}
-        stored_auth_token = f"{order_id}_{authorization_token}" if authorization_token else f"{order_id}_NO_TOKEN"
-
-        # Fake expiration if not provided
-        auth_exp = auth_resp.get("authExpiration")
-        try:
-            # if service returns ISO string, you can parse it in service; keep simple here:
-            auth_exp_dt = datetime.utcnow() + timedelta(days=7)
-        except Exception:
-            auth_exp_dt = datetime.utcnow() + timedelta(days=7)
-
-        # Save to AUTHORIZATIONS table (success or failure)
-        try:
-            conn = _db()
-            cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT INTO authorizations
-                    (order_id, auth_token, authorized_amount, auth_expiration, response_status, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    total_amount,
+                    status
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     order_id,
-                    stored_auth_token,
-                    str(authorized_amount if authorized_amount is not None else requested_amount),
-                    auth_exp_dt,
+                    first_name,
+                    last_name,
+                    f"{address} {zip_code}".strip(),
+                    requested_amount,
+                    "Pending",
+                ),
+            )
+            conn.commit()
+
+            log_event(
+                order_id,
+                "ORDER_CREATED",
+                "Order created successfully.",
+                metadata={
+                    "customer_fname": first_name,
+                    "customer_lname": last_name,
+                    "requested_amount": str(requested_amount),
+                },
+            )
+
+            log_event(order_id, "TOKEN_REQUEST", "Requesting payment token.")
+            token = get_oauth_token()
+            log_event(order_id, "TOKEN_RESPONSE", "Payment token received successfully.")
+
+            log_event(
+                order_id,
+                "AUTH_REQUEST",
+                "Submitting authorization request.",
+                metadata={"requested_amount": str(requested_amount)},
+            )
+
+            auth_resp = authorize_payment(
+                order_id=order_id,
+                card_number=card_number,
+                card_month=month,
+                card_year=year,
+                cvv=cvv,
+                requested_amount=float(requested_amount),
+                token=token,
+            )
+
+            response_status = str(auth_resp.get("status", "Error")).strip()
+            provider_status_code = int(auth_resp.get("provider_status_code") or 0)
+            auth_token = auth_resp.get("authorizationToken")
+            auth_expiration = parse_auth_expiration(auth_resp.get("authExpiration"))
+            auth_message = auth_resp.get("message", "")
+            authorized_amount = to_decimal(auth_resp.get("authorizedAmount"), "0.00")
+
+            approved = response_status.lower() in {"approved", "authorized"}
+
+            if not approved:
+                authorized_amount = Decimal("0.00")
+
+            order_status = "Authorized" if approved else "Failed"
+
+            composite_auth_token = f"{order_id}_{auth_token}" if auth_token else None
+
+            cursor.execute(
+                """
+                INSERT INTO authorizations (
+                    order_id,
+                    auth_token,
+                    authorized_amount,
+                    auth_expiration,
+                    response_status
+                ) VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    order_id,
+                    composite_auth_token,
+                    authorized_amount,
+                    auth_expiration,
                     response_status,
-                    datetime.utcnow(),
                 ),
             )
 
-            # Update order status
-            if response_status.lower() == "approved":
-                new_status = "Authorized"
-            elif http_status >= 500:
-                new_status = "Failed – System Error"
-            else:
-                new_status = "Failed"
+            cursor.execute(
+                """
+                UPDATE orders
+                SET status = %s
+                WHERE order_id = %s
+                """,
+                (order_status, order_id),
+            )
 
-            cur.execute("UPDATE orders SET status=%s WHERE order_id=%s", (new_status, order_id))
             conn.commit()
 
-            _log(order_id, "AUTH_RESPONSE", f"status={response_status} http={http_status} msg={message}")
-        except Exception as e:
-            _log(order_id, "DB_ERROR", f"Failed saving authorization: {e}")
-            return jsonify({"ok": False, "order_id": order_id, "message": "Database error saving authorization."}), 500
-        finally:
+            log_event(
+                order_id,
+                "AUTH_RESPONSE",
+                auth_message or "Authorization response received.",
+                level="INFO" if approved else "WARNING",
+                metadata={
+                    "response_status": response_status,
+                    "provider_status_code": provider_status_code,
+                    "authorized_amount": str(authorized_amount),
+                    "order_status": order_status,
+                },
+            )
+
+            if approved:
+                return jsonify(
+                    {
+                        "status": "Authorized",
+                        "order_id": order_id,
+                        "order_status": order_status,
+                        "authorizedAmount": float(authorized_amount),
+                        "amount": float(authorized_amount),
+                        "message": auth_message or "Payment authorized successfully.",
+                    }
+                ), 200
+
+            return jsonify(
+                {
+                    "status": "Failed",
+                    "order_id": order_id,
+                    "order_status": order_status,
+                    "authorizedAmount": 0.0,
+                    "amount": 0.0,
+                    "message": auth_message or "Payment authorization failed.",
+                }
+            ), 200
+
+        except PaymentServiceError as e:
+            if conn:
+                conn.rollback()
+
             try:
-                cur.close()
-                conn.close()
+                if conn and cursor:
+                    cursor.execute(
+                        "UPDATE orders SET status = %s WHERE order_id = %s",
+                        ("Error", order_id),
+                    )
+                    conn.commit()
             except Exception:
                 pass
 
-        # Return minimal safe info (no PAN/CVV)
-        return jsonify(
-            {
-                "ok": response_status.lower() == "approved",
-                "order_id": order_id,
-                "status": response_status,
-                "order_status": "Authorized" if response_status.lower() == "approved" else "Failed",
-                "authorized_amount": authorized_amount,
-                "card_last4": _card_last4(card_number),
-                "message": message or ("Payment Authorized" if response_status.lower() == "approved" else "Authorization Failed"),
-            }
-        ), (200 if response_status.lower() == "approved" else 402)
+            log_event(
+                order_id,
+                "PAYMENT_SERVICE_ERROR",
+                str(e),
+                level="ERROR",
+            )
 
-    # -----------------------------
-    # Orders list page (sorting/filtering in UI; server supports query params too)
-    # -----------------------------
-    @app.get("/orders")
+            return jsonify(
+                {
+                    "status": "Error",
+                    "order_id": order_id,
+                    "message": str(e),
+                }
+            ), 502
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+
+            try:
+                if conn and cursor:
+                    cursor.execute(
+                        "UPDATE orders SET status = %s WHERE order_id = %s",
+                        ("Error", order_id),
+                    )
+                    conn.commit()
+            except Exception:
+                pass
+
+            log_event(
+                order_id,
+                "SYSTEM_ERROR",
+                str(e),
+                level="ERROR",
+            )
+
+            print("CHECKOUT ERROR:", str(e))
+
+            return jsonify(
+                {
+                    "status": "Error",
+                    "order_id": order_id,
+                    "message": str(e)
+                }
+            ), 500
+
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/orders")
     def order_list():
-        q = (request.args.get("q") or "").strip()  # simple text search
-        status = (request.args.get("status") or "").strip()
-        sort = (request.args.get("sort") or "created_at").strip()
-        direction = (request.args.get("dir") or "desc").strip().lower()
+        status = request.args.get("status", "all")
+        sort_by = request.args.get("sort_by", "created_at")
+        sort_dir = request.args.get("sort_dir", "DESC")
 
-        allowed_sort = {"order_id", "customer_fname", "customer_lname", "total_amount", "status", "created_at"}
-        if sort not in allowed_sort:
-            sort = "created_at"
-        if direction not in {"asc", "desc"}:
-            direction = "desc"
-
-        # Build query safely
-        where = []
-        params = []
-
-        if q:
-            where.append("(order_id LIKE %s OR customer_fname LIKE %s OR customer_lname LIKE %s)")
-            like = f"%{q}%"
-            params.extend([like, like, like])
-
-        if status:
-            where.append("status = %s")
-            params.append(status)
-
-        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-
-        sql = f"""
-            SELECT order_id, customer_fname, customer_lname, address, total_amount, status, created_at
-            FROM orders
-            {where_sql}
-            ORDER BY {sort} {direction}
-            LIMIT 500
-        """
-
-        orders = []
         try:
-            conn = _db()
-            cur = conn.cursor(dictionary=True)
-            cur.execute(sql, tuple(params))
-            orders = cur.fetchall()
+            orders = fetch_orders(status=status, sort_by=sort_by, sort_dir=sort_dir)
+            return render_template("order_list.html", orders=orders)
         except Exception as e:
-            _log(None, "DB_ERROR", f"Failed loading orders: {e}")
-            flash("Database error loading orders.", "error")
-        finally:
-            try:
-                cur.close()
-                conn.close()
-            except Exception:
-                pass
+            log_event(None, "ORDER_LIST_ERROR", str(e), level="ERROR")
+            return render_template("order_list.html", orders=[], error="Unable to load orders.")
 
-        return render_template("order_list.html", orders=orders, q=q, status=status, sort=sort, direction=direction)
+    @app.route("/settlement", methods=["GET", "POST"])
+    def settlement():
+        if request.method == "GET":
+            return render_template("settlement.html")
 
-    # -----------------------------
-    # Settlement page + API
-    # -----------------------------
-    @app.get("/settlement")
-    def settlement_page():
-        return render_template("settlement.html")
+        data = get_json_payload()
+        order_id = str(data.get("order_id", "")).strip()
+        settlement_amount = to_decimal(data.get("settlement_amount"), "0.00")
 
-    @app.post("/api/settle")
-    def api_settle():
-        """
-        Warehouse settlement:
-        - requires order is Authorized
-        - settlement_amount <= authorized_amount (latest approved auth)
-        """
-        data = request.get_json(silent=True) or {}
-        order_id = (data.get("order_id") or "").strip()
         if not order_id:
-            return jsonify({"ok": False, "message": "Order ID is required."}), 400
+            return jsonify({"status": "Error", "message": "Order ID is required."}), 400
+
+        if settlement_amount <= 0:
+            return jsonify({"status": "Error", "message": "Settlement amount must be greater than 0."}), 400
+
+        conn = None
+        cursor = None
 
         try:
-            settlement_amount = _to_money(data.get("settlement_amount"))
-        except ValueError:
-            return jsonify({"ok": False, "message": "Invalid settlement amount."}), 400
+            conn = get_connection()
+            cursor = conn.cursor(dictionary=True)
 
-        try:
-            conn = _db()
-            cur = conn.cursor(dictionary=True)
+            log_event(
+                order_id,
+                "SETTLEMENT_ATTEMPT",
+                "Settlement requested.",
+                metadata={"settlement_amount": str(settlement_amount)},
+            )
 
-            # Verify order status
-            cur.execute("SELECT status FROM orders WHERE order_id=%s", (order_id,))
-            row = cur.fetchone()
-            if not row:
-                return jsonify({"ok": False, "message": "Order not found."}), 404
-
-            if (row["status"] or "").lower() != "authorized":
-                return jsonify({"ok": False, "message": "Order is not authorized and cannot be settled."}), 409
-
-            # Get latest approved authorization amount
-            cur.execute(
+            cursor.execute(
                 """
-                SELECT authorized_amount
+                SELECT order_id, status, total_amount
+                FROM orders
+                WHERE order_id = %s
+                """,
+                (order_id,),
+            )
+            order_row = cursor.fetchone()
+
+            if not order_row:
+                return jsonify({"status": "Error", "message": "Order not found."}), 404
+
+            cursor.execute(
+                """
+                SELECT authorized_amount, response_status, auth_expiration, created_at
                 FROM authorizations
-                WHERE order_id=%s AND LOWER(response_status)='approved'
+                WHERE order_id = %s
                 ORDER BY created_at DESC
                 LIMIT 1
                 """,
                 (order_id,),
             )
-            auth = cur.fetchone()
-            if not auth:
-                return jsonify({"ok": False, "message": "No approved authorization found for this order."}), 409
+            auth_row = cursor.fetchone()
 
-            authorized_amount = Decimal(str(auth["authorized_amount"])).quantize(Decimal("0.01"))
+            if not auth_row:
+                return jsonify(
+                    {"status": "Error", "message": "No authorization record found for this order."}
+                ), 400
+
+            latest_status = str(auth_row.get("response_status", "")).strip().lower()
+            authorized_amount = to_decimal(auth_row.get("authorized_amount"), "0.00")
+
+            if latest_status not in {"approved", "authorized"} and str(order_row.get("status", "")).lower() != "authorized":
+                return jsonify(
+                    {"status": "Error", "message": "This order is not authorized for settlement."}
+                ), 400
 
             if settlement_amount > authorized_amount:
                 return jsonify(
                     {
-                        "ok": False,
-                        "message": f"Settlement amount (${settlement_amount}) is greater than authorized amount (${authorized_amount}).",
+                        "status": "Error",
+                        "message": "Settlement amount cannot exceed the authorized amount.",
                     }
-                ), 422
+                ), 400
 
-            # Insert settlement + update order
-            cur.execute(
+            cursor.execute(
                 """
-                INSERT INTO settlements (order_id, settlement_amount, created_at)
-                VALUES (%s, %s, %s)
+                SELECT settlement_id
+                FROM settlements
+                WHERE order_id = %s
+                LIMIT 1
                 """,
-                (order_id, str(settlement_amount), datetime.utcnow()),
+                (order_id,),
             )
-            cur.execute("UPDATE orders SET status=%s WHERE order_id=%s", ("Settled", order_id))
+            existing_settlement = cursor.fetchone()
+
+            if existing_settlement:
+                return jsonify(
+                    {"status": "Error", "message": "This order has already been settled."}
+                ), 400
+
+            cursor.execute(
+                """
+                INSERT INTO settlements (order_id, settlement_amount)
+                VALUES (%s, %s)
+                """,
+                (order_id, settlement_amount),
+            )
+
+            cursor.execute(
+                """
+                UPDATE orders
+                SET status = %s
+                WHERE order_id = %s
+                """,
+                ("Settled", order_id),
+            )
+
             conn.commit()
 
-            _log(order_id, "SETTLEMENT_SUCCESS", f"Settled {settlement_amount} <= authorized {authorized_amount}")
+            log_event(
+                order_id,
+                "SETTLEMENT_SUCCESS",
+                "Settlement completed successfully.",
+                metadata={"settlement_amount": str(settlement_amount)},
+            )
 
             return jsonify(
                 {
-                    "ok": True,
+                    "status": "Success",
                     "order_id": order_id,
-                    "message": "Settlement successful.",
-                    "settlement_amount": str(settlement_amount),
-                    "authorized_amount": str(authorized_amount),
+                    "settlement_amount": float(settlement_amount),
+                    "message": f"Settlement completed for order {order_id}.",
                 }
-            )
+            ), 200
+
         except Exception as e:
-            _log(order_id, "DB_ERROR", f"Settlement failed: {e}")
-            return jsonify({"ok": False, "message": "Database error during settlement."}), 500
+            if conn:
+                conn.rollback()
+
+            log_event(
+                order_id,
+                "SETTLEMENT_ERROR",
+                str(e),
+                level="ERROR",
+            )
+
+            print("SETTLEMENT ERROR:", str(e))
+
+            return jsonify(
+                {
+                    "status": "Error",
+                    "message": str(e),
+                }
+            ), 500
+
         finally:
-            try:
-                cur.close()
+            if cursor:
+                cursor.close()
+            if conn:
                 conn.close()
-            except Exception:
-                pass
 
     return app
 
@@ -471,5 +579,4 @@ def create_app() -> Flask:
 app = create_app()
 
 if __name__ == "__main__":
-    # Local dev server
-    app.run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")), debug=True)
+    app.run(debug=True, port=int(os.getenv("FLASK_PORT", 5001)))
