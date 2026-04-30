@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop the Collection — Packify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="{{ url_for('root') }}" class="nav-logo">PACK<span>ify</span></a>
+
+  <div class="nav-links">
+    <a href="{{ url_for('root') }}">Home</a>
+    <a href="{{ url_for('products') }}">Shop</a>
+    <a href="{{ url_for('order_list') }}">Orders</a>
+    <a href="{{ url_for('settlement') }}">Warehouse</a>
+    <a href="{{ url_for('inventory') }}">Inventory</a>
+    <a href="{{ url_for('returns') }}">Returns</a>
+  </div>
+
+  <a href="{{ url_for('cart') }}" class="cart-btn">
+    🛍 Cart <span class="cart-count">0</span>
+  </a>
+</nav>
+
+<header class="page-header">
+  <div class="page-header-inner">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('root') }}">Home</a>
+      <span class="breadcrumb-sep">/</span>
+      <span>Shop</span>
+    </nav>
+    <h1>The Collection</h1>
+    <p>12 styles across 6 brands — free shipping over $75</p>
+  </div>
+</header>
+
+<section class="filter-section">
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterProducts('all', this)">All</button>
+    <button class="filter-btn" onclick="filterProducts('northface', this)">The North Face</button>
+    <button class="filter-btn" onclick="filterProducts('nike', this)">Nike</button>
+    <button class="filter-btn" onclick="filterProducts('jansport', this)">JanSport</button>
+    <button class="filter-btn" onclick="filterProducts('fjallraven', this)">Fjällräven</button>
+    <button class="filter-btn" onclick="filterProducts('herschel', this)">Herschel</button>
+    <button class="filter-btn" onclick="filterProducts('tumi', this)">Tumi</button>
+  </div>
+</section>
+
+<section class="products-section">
+  <div class="products-grid" id="products-grid">
+
+    <div class="product-card" data-brand="northface">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop" alt="North Face Borealis Backpack">
+        <span class="product-brand-tag">The North Face</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Borealis Backpack</h3>
+        <p class="product-desc">29L · Lark grey</p>
+        <div class="product-footer">
+          <div class="product-price">$109.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Borealis Backpack', 109)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="fjallraven">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1581605405669-fcdf81165afa?w=400&h=300&fit=crop" alt="Fjallraven Kanken Classic">
+        <span class="product-brand-tag">Fjällräven</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Kånken Classic</h3>
+        <p class="product-desc">16L · Dusty desk</p>
+        <div class="product-footer">
+          <div class="product-price">$95.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Kånken Classic', 95)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="herschel">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1624687751372-25f9e6f08e46?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Herschel Nova Mid Backpack">
+        <span class="product-brand-tag">Herschel</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Nova Mid Backpack</h3>
+        <p class="product-desc">18L · Sky Haze / Naval orange</p>
+        <div class="product-footer">
+          <div class="product-price">$85.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Nova Mid Backpack', 85)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="jansport">
+      <div class="product-img">
+        <img src="https://plus.unsplash.com/premium_photo-1723649902734-60ec42167731?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="JanSport Right Pack">
+        <span class="product-brand-tag">JanSport</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Right Pack Expressions</h3>
+        <p class="product-desc">31L · Light Midnight</p>
+        <div class="product-footer">
+          <div class="product-price">$55.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Right Pack Expressions', 55)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="nike">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1547949003-9792a18a2601?w=400&h=300&fit=crop" alt="Nike Futura Luxe Backpack">
+        <span class="product-brand-tag">Nike</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Futura Luxe Backpack</h3>
+        <p class="product-desc">15L · Background grey / Sail brown</p>
+        <div class="product-footer">
+          <div class="product-price">$75.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Futura Luxe Backpack', 75)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="tumi">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1621624959365-071359461b94?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Tumi Voyageur Carson Backpack">
+        <span class="product-brand-tag">Tumi</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Voyageur Carson Backpack</h3>
+        <p class="product-desc">20L · Blush Black/white</p>
+        <div class="product-footer">
+          <div class="product-price">$295.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Voyageur Carson Backpack', 295)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="northface">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1611010344444-5f9e4d86a6e1?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="North Face Jester Backpack">
+        <span class="product-brand-tag">The North Face</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Jester Backpack</h3>
+        <p class="product-desc">26L · Gardenia grey</p>
+        <div class="product-footer">
+          <div class="product-price">$75.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Jester Backpack', 75)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="herschel">
+      <div class="product-img">
+        <img src="https://plus.unsplash.com/premium_photo-1679314408041-45d1a3c45dee?q=80&w=1227&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Herschel Little America Mid">
+        <span class="product-brand-tag">Herschel</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Little America Mid</h3>
+        <p class="product-desc">17L · Ash Rose / Desert</p>
+        <div class="product-footer">
+          <div class="product-price">$100.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Little America Mid', 100)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="nike">
+      <div class="product-img">
+        <img src="https://plus.unsplash.com/premium_photo-1723649902717-3bab5a454ed2?q=80&w=2671&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Brasilia Training Backpack">
+        <span class="product-brand-tag">Nike</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Brasilia 9.5 Training</h3>
+        <p class="product-desc">24L · Blush Pink</p>
+        <div class="product-footer">
+          <div class="product-price">$45.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Brasilia 9.5 Training', 45)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="jansport">
+      <div class="product-img">
+        <img src="https://plus.unsplash.com/premium_photo-1722993519879-aadaa597ba3f?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="SuperBreak Plus">
+        <span class="product-brand-tag">JanSport</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">SuperBreak Plus</h3>
+        <p class="product-desc">Bright Blue</p>
+        <div class="product-footer">
+          <div class="product-price">$48.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'SuperBreak Plus', 48)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="fjallraven">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1526736068954-3d647ef94973?q=80&w=2671&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Fjallraven Kanken Mini">
+        <span class="product-brand-tag">Fjällräven</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Kånken Mini</h3>
+        <p class="product-desc">Classic</p>
+        <div class="product-footer">
+          <div class="product-price">$75.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Kånken Mini', 75)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card" data-brand="tumi">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1596273501899-336404ed1701?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Tumi Larkin Backpack">
+        <span class="product-brand-tag">Tumi</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Larkin Backpack</h3>
+        <p class="product-desc">19L · Pearl</p>
+        <div class="product-footer">
+          <div class="product-price">$350.00</div>
+          <button class="add-to-cart" onclick="addToCart(this, 'Larkin Backpack', 350)">+</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="order-summary-bar" id="cart-summary-bar" style="display:none;">
+    <div class="summary-bar-inner">
+      <h4>Your Bag</h4>
+      <div id="mini-cart-list"></div>
+      <div class="summary-totals" style="margin-top:.75rem;">
+        <div class="summary-row"><span>Subtotal</span><span id="cart-subtotal">$0.00</span></div>
+        <div class="summary-row muted"><span>Tax (8%)</span><span id="cart-tax">$0.00</span></div>
+        <div class="summary-row total-row"><span>Total</span><span id="cart-total">$0.00</span></div>
+      </div>
+      <a href="{{ url_for('checkout') }}" class="btn-primary btn-full" style="margin-top:1rem; display:block; text-align:center;">Checkout →</a>
+    </div>
+  </div>
+
+</section>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-logo">PACK<span>ify</span></div>
+    <p class="footer-tagline">Curated backpacks for every journey.</p>
+    <p class="footer-copy">&copy; 2025 Packify. All rights reserved. &middot; Built for KSU students.</p>
+  </div>
+</footer>
+
+<script>
+let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+function normalizeCart() {
+  cart = cart.map(item => ({
+    name: item.name,
+    price: Number(item.price),
+    quantity: Number(item.quantity ?? item.qty ?? 1)
+  }));
+  localStorage.setItem("cart", JSON.stringify(cart));
+}
+
+function filterProducts(brand, btn) {
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+
+  document.querySelectorAll(".product-card").forEach(card => {
+    card.style.display = (brand === "all" || card.dataset.brand === brand) ? "block" : "none";
+  });
+}
+
+function addToCart(btn, name, price) {
+  const existing = cart.find(item => item.name === name);
+
+  if (existing) {
+    existing.quantity++;
+  } else {
+    cart.push({ name, price, quantity: 1 });
+  }
+
+  updateCart();
+
+  btn.style.background = "#c97b7b";
+  btn.style.color = "#fff";
+
+  setTimeout(() => {
+    btn.style.background = "";
+    btn.style.color = "";
+  }, 500);
+}
+
+function updateCart() {
+  localStorage.setItem("cart", JSON.stringify(cart));
+
+  const count = cart.reduce((total, item) => total + item.quantity, 0);
+  document.querySelectorAll(".cart-count").forEach(el => {
+    el.textContent = count;
+  });
+
+  const sub = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const tax = sub * 0.08;
+
+  const subtotalEl = document.getElementById("cart-subtotal");
+  const taxEl = document.getElementById("cart-tax");
+  const totalEl = document.getElementById("cart-total");
+  const miniCartListEl = document.getElementById("mini-cart-list");
+  const summaryBarEl = document.getElementById("cart-summary-bar");
+
+  if (subtotalEl) subtotalEl.textContent = "$" + sub.toFixed(2);
+  if (taxEl) taxEl.textContent = "$" + tax.toFixed(2);
+  if (totalEl) totalEl.textContent = "$" + (sub + tax).toFixed(2);
+
+  if (miniCartListEl) {
+    miniCartListEl.innerHTML = cart.map(item => `
+      <div class="mini-cart-item">
+        <span>${item.name} ×${item.quantity}</span>
+        <span>$${(item.price * item.quantity).toFixed(2)}</span>
+      </div>
+    `).join("");
+  }
+
+  if (summaryBarEl) {
+    summaryBarEl.style.display = count > 0 ? "block" : "none";
+  }
+}
+
+normalizeCart();
+updateCart();
+</script>
+
+</body>
+</html>

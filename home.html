@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Packify — Carry Your Story</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="{{ url_for('root') }}" class="nav-logo">PACK<span>ify</span></a>
+
+  <div class="nav-links">
+    <a href="{{ url_for('root') }}">Home</a>
+    <a href="{{ url_for('products') }}">Shop</a>
+    <a href="{{ url_for('order_list') }}">Orders</a>
+    <a href="{{ url_for('settlement') }}">Warehouse</a>
+    <a href="{{ url_for('inventory') }}">Inventory</a>
+    <a href="{{ url_for('returns') }}">Returns</a>
+  </div>
+
+  <a href="{{ url_for('cart') }}" class="cart-btn">
+    🛍 Cart <span class="cart-count">0</span>
+  </a>
+</nav>
+
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-tag">✦ New Season Arrivals</div>
+    <h1>Carry your <em>story</em><br>everywhere you go.</h1>
+    <p>Curated backpacks from the world's most beloved brands — for students, explorers, and everyday dreamers.</p>
+
+    <div class="hero-actions">
+      <a href="{{ url_for('products') }}" class="btn-primary">Shop the Collection</a>
+      <a href="{{ url_for('products') }}" class="btn-outline">View All Brands</a>
+    </div>
+
+    <div class="hero-badges">
+      <div class="badge-item"><div class="badge-dot"></div>Free shipping over $75</div>
+      <div class="badge-item"><div class="badge-dot"></div>Easy 30-day returns</div>
+      <div class="badge-item"><div class="badge-dot"></div>KSU student deals</div>
+    </div>
+  </div>
+
+  <div class="hero-image-col">
+    <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&h=600&fit=crop" alt="Featured backpack" class="hero-img">
+  </div>
+</section>
+
+<div class="brands-bar">
+  <div class="brands-inner">
+    <span class="brand-name">The North Face</span>
+    <span class="brand-name">Nike</span>
+    <span class="brand-name">JanSport</span>
+    <span class="brand-name">Fjällräven</span>
+    <span class="brand-name">Herschel</span>
+    <span class="brand-name">Tumi</span>
+  </div>
+</div>
+
+<section class="home-featured">
+  <div class="section-header">
+    <h2>Featured Styles</h2>
+    <p>Handpicked for the KSU community</p>
+  </div>
+
+  <div class="products-grid" style="max-width:1140px; margin:0 auto; padding:0 2rem 3rem;">
+
+    <div class="product-card">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop" alt="North Face Borealis">
+        <span class="product-brand-tag">The North Face</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Borealis Backpack</h3>
+        <p class="product-desc">29L · Rose Mauve / Gardenia White</p>
+        <div class="product-footer">
+          <div class="product-price">$109.00</div>
+          <a href="{{ url_for('products') }}" class="add-to-cart" title="Shop now">→</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1581605405669-fcdf81165afa?w=400&h=300&fit=crop" alt="Fjallraven Kanken">
+        <span class="product-brand-tag">Fjällräven</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Kånken Classic</h3>
+        <p class="product-desc">16L · Dusty Grey / Peach Pink</p>
+        <div class="product-footer">
+          <div class="product-price">$95.00</div>
+          <a href="{{ url_for('products') }}" class="add-to-cart" title="Shop now">→</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="product-card">
+      <div class="product-img">
+        <img src="https://images.unsplash.com/photo-1624687751372-25f9e6f08e46?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Herschel Nova Mid">
+        <span class="product-brand-tag">Herschel</span>
+      </div>
+      <div class="product-info">
+        <h3 class="product-name">Nova Mid Backpack</h3>
+        <p class="product-desc">18L · Orange Haze / Chalk</p>
+        <div class="product-footer">
+          <div class="product-price">$85.00</div>
+          <a href="{{ url_for('products') }}" class="add-to-cart" title="Shop now">→</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="text-align:center; padding-bottom:3rem;">
+    <a href="{{ url_for('products') }}" class="btn-primary">View All 12 Styles →</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-logo">PACK<span>ify</span></div>
+    <p class="footer-tagline">Curated backpacks for every journey.</p>
+    <p class="footer-copy">&copy; 2025 Packify. All rights reserved. &middot; Built for KSU students.</p>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+</body>
+</html>

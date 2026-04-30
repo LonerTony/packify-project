@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Cart — Packify</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="{{ url_for('root') }}" class="nav-logo">PACK<span>ify</span></a>
+
+  <div class="nav-links">
+    <a href="{{ url_for('root') }}">Home</a>
+    <a href="{{ url_for('products') }}">Shop</a>
+    <a href="{{ url_for('order_list') }}">Orders</a>
+    <a href="{{ url_for('settlement') }}">Warehouse</a>
+    <a href="{{ url_for('inventory') }}">Inventory</a>
+    <a href="{{ url_for('returns') }}">Returns</a>
+  </div>
+
+  <a href="{{ url_for('cart') }}" class="cart-btn">
+    🛍 Cart <span class="cart-count">0</span>
+  </a>
+</nav>
+
+<header class="page-header">
+  <div class="page-header-inner">
+    <h1>Your Bag</h1>
+    <p>Review your items before checkout</p>
+  </div>
+</header>
+
+<section class="checkout-container">
+  <div class="checkout-grid">
+
+    <div class="form-card">
+      <h3>Shopping Bag</h3>
+      <div id="cart-items"></div>
+    </div>
+
+    <div class="order-summary-card">
+      <h3>Order Summary</h3>
+
+      <div class="summary-row">
+        <span>Subtotal</span>
+        <span id="subtotal">$0.00</span>
+      </div>
+
+      <div class="summary-row muted">
+        <span>Tax (8%)</span>
+        <span id="tax">$0.00</span>
+      </div>
+
+      <div class="summary-row total-row">
+        <span>Total</span>
+        <span id="total">$0.00</span>
+      </div>
+
+      <a href="{{ url_for('checkout') }}" class="btn-primary btn-full">
+        Checkout →
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-logo">PACK<span>ify</span></div>
+    <p class="footer-tagline">Curated backpacks for every journey.</p>
+    <p class="footer-copy">&copy; 2025 Packify. All rights reserved. &middot; Built for KSU students.</p>
+  </div>
+</footer>
+
+<script>
+const imageMap = {
+  "Borealis Backpack": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400",
+  "Kånken Classic": "https://images.unsplash.com/photo-1581605405669-fcdf81165afa?w=400",
+  "Nova Mid Backpack": "https://images.unsplash.com/photo-1624687751372-25f9e6f08e46?w=400",
+  "Right Pack Expressions": "https://plus.unsplash.com/premium_photo-1723649902734-60ec42167731?w=400",
+  "Futura Luxe Backpack": "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=400",
+  "Voyageur Carson Backpack": "https://images.unsplash.com/photo-1621624959365-071359461b94?w=400",
+  "Jester Backpack": "https://images.unsplash.com/photo-1611010344444-5f9e4d86a6e1?w=400",
+  "Little America Mid": "https://plus.unsplash.com/premium_photo-1679314408041-45d1a3c45dee?w=400",
+  "Brasilia 9.5 Training": "https://plus.unsplash.com/premium_photo-1723649902717-3bab5a454ed2?w=400",
+  "SuperBreak Plus": "https://plus.unsplash.com/premium_photo-1722993519879-aadaa597ba3f?w=400",
+  "Kånken Mini": "https://images.unsplash.com/photo-1526736068954-3d647ef94973?w=400",
+  "Larkin Backpack": "https://images.unsplash.com/photo-1596273501899-336404ed1701?w=400"
+};
+
+let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+cart = cart.map(item => ({
+  name: item.name,
+  price: Number(item.price),
+  quantity: Number(item.quantity ?? item.qty ?? 1)
+}));
+
+function updateCartCount() {
+  const total = cart.reduce((sum, item) => sum + item.quantity, 0);
+  document.querySelectorAll(".cart-count").forEach(el => {
+    el.textContent = total;
+  });
+}
+
+function renderCart() {
+  const container = document.getElementById("cart-items");
+
+  if (!container) return;
+
+  if (cart.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>Your bag is empty.</p>
+        <br>
+        <a href="{{ url_for('products') }}" class="btn-primary">Shop Now</a>
+      </div>
+    `;
+    updateTotals();
+    return;
+  }
+
+  container.innerHTML = cart.map((item, i) => `
+    <div class="cart-item" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 0; border-bottom:1px solid #eee;">
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <img src="${imageMap[item.name] || ''}" alt="${item.name}" class="cart-img">
+        <div>
+          <h4 style="margin:0 0 .25rem 0;">${item.name}</h4>
+          <p style="margin:0; color:#666;">$${item.price.toFixed(2)} each</p>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:.75rem;">
+        <button onclick="changeQty(${i}, -1)" style="padding:.4rem .7rem; border:none; border-radius:999px;">−</button>
+        <span>${item.quantity}</span>
+        <button onclick="changeQty(${i}, 1)" style="padding:.4rem .7rem; border:none; border-radius:999px;">+</button>
+        <button onclick="removeItem(${i})" style="padding:.5rem .8rem; border:none; border-radius:999px; background:#fdecec;">Remove</button>
+      </div>
+    </div>
+  `).join("");
+
+  updateTotals();
+}
+
+function changeQty(i, change) {
+  cart[i].quantity += change;
+
+  if (cart[i].quantity <= 0) {
+    cart.splice(i, 1);
+  }
+
+  saveCart();
+}
+
+function removeItem(i) {
+  cart.splice(i, 1);
+  saveCart();
+}
+
+function updateTotals() {
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const tax = subtotal * 0.08;
+  const total = subtotal + tax;
+
+  document.getElementById("subtotal").textContent = "$" + subtotal.toFixed(2);
+  document.getElementById("tax").textContent = "$" + tax.toFixed(2);
+  document.getElementById("total").textContent = "$" + total.toFixed(2);
+
+  updateCartCount();
+}
+
+function saveCart() {
+  localStorage.setItem("cart", JSON.stringify(cart));
+  renderCart();
+}
+
+renderCart();
+</script>
+</body>
+</html>

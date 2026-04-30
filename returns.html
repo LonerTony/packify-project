@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Packify — Returns Management</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="{{ url_for('root') }}" class="nav-logo">PACK<span>ify</span></a>
+
+  <div class="nav-links">
+    <a href="{{ url_for('root') }}">Home</a>
+    <a href="{{ url_for('products') }}">Shop</a>
+    <a href="{{ url_for('order_list') }}">Orders</a>
+    <a href="{{ url_for('settlement') }}">Warehouse</a>
+    <a href="{{ url_for('inventory') }}">Inventory</a>
+    <a href="{{ url_for('returns') }}">Returns</a>
+  </div>
+
+  <a href="{{ url_for('cart') }}" class="cart-btn">
+    🛍 Cart <span class="cart-count">0</span>
+  </a>
+</nav>
+
+<section class="page">
+  <div class="page-header-block">
+    <div class="page-title">
+      <h1>Returns Management</h1>
+      <p>Validate an order, select an item from that order, then submit the return.</p>
+    </div>
+  </div>
+
+  <div class="return-form-card">
+    <h2>Validate Order</h2>
+
+    <div class="validation-row">
+      <input type="text" id="validate-order-id" placeholder="Enter Order ID">
+      <button type="button" class="validate-btn" id="validate-order-btn">Validate Order</button>
+      <div id="validation-message" class="validation-message"></div>
+    </div>
+
+    <form id="return-form">
+      <div id="return-fields" class="locked-section">
+
+        <div class="return-form-grid">
+          <div class="return-form-group">
+            <label for="order_id">Order ID</label>
+            <input type="text" id="order_id" name="order_id" readonly>
+          </div>
+
+          <div class="return-form-group">
+            <label for="product_name">Product</label>
+            <select id="product_name" name="product_name" disabled required>
+              <option value="">Validate order first</option>
+            </select>
+          </div>
+
+          <div class="return-form-group">
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" name="quantity" min="1" value="1" disabled required>
+          </div>
+
+          <div class="return-form-group">
+            <label for="reason">Return Reason</label>
+            <select id="reason" name="reason" disabled required>
+              <option value="">Select a reason</option>
+              <option value="Damaged Item">Damaged Item</option>
+              <option value="Wrong Item Sent">Wrong Item Sent</option>
+              <option value="Defective Product">Defective Product</option>
+              <option value="No Longer Needed">No Longer Needed</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="return-form-group full-width">
+            <label for="notes">Additional Notes</label>
+            <textarea id="notes" name="notes" placeholder="Optional notes" disabled></textarea>
+          </div>
+        </div>
+
+        <div class="return-actions">
+          <button type="submit" class="return-submit-btn">Submit Return</button>
+          <div id="return-message" class="return-message"></div>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <div class="table-card">
+    <table id="returns-table">
+      <thead>
+        <tr>
+          <th>Return ID</th>
+          <th>Order ID</th>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Reason</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% if returns and returns|length > 0 %}
+          {% for item in returns %}
+          <tr>
+            <td>{{ item.return_id }}</td>
+            <td>{{ item.order_id }}</td>
+            <td>{{ item.item }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.reason }}</td>
+            <td>{{ item.status }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty-state">No return records yet.</div>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-logo">PACK<span>ify</span></div>
+    <p class="footer-tagline">Curated backpacks for every journey.</p>
+    <p class="footer-copy">&copy; 2025 Packify. All rights reserved.</p>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+
+<script>
+const validateBtn = document.getElementById("validate-order-btn");
+const validateInput = document.getElementById("validate-order-id");
+const validationMessage = document.getElementById("validation-message");
+
+const returnFields = document.getElementById("return-fields");
+const orderIdField = document.getElementById("order_id");
+const productField = document.getElementById("product_name");
+const quantityField = document.getElementById("quantity");
+const reasonField = document.getElementById("reason");
+const notesField = document.getElementById("notes");
+
+const returnForm = document.getElementById("return-form");
+const returnMessage = document.getElementById("return-message");
+
+function setMessage(element, message, type) {
+  element.textContent = message;
+  element.className = type ? `${element.id.includes("validation") ? "validation-message" : "return-message"} ${type}` : element.className;
+}
+
+function lockReturnForm() {
+  returnFields.classList.add("locked-section");
+
+  orderIdField.value = "";
+  productField.innerHTML = `<option value="">Validate order first</option>`;
+  productField.disabled = true;
+
+  quantityField.value = 1;
+  quantityField.removeAttribute("max");
+  quantityField.disabled = true;
+
+  reasonField.value = "";
+  reasonField.disabled = true;
+
+  notesField.value = "";
+  notesField.disabled = true;
+}
+
+function unlockReturnForm(orderId, items) {
+  returnFields.classList.remove("locked-section");
+  orderIdField.value = orderId;
+
+  productField.innerHTML = `<option value="">Select product</option>`;
+
+  items.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.product_name;
+    option.textContent = `${item.product_name} — Available to return: ${item.remaining_qty}`;
+    option.dataset.maxQty = item.remaining_qty;
+    productField.appendChild(option);
+  });
+
+  productField.disabled = false;
+  quantityField.disabled = false;
+  reasonField.disabled = false;
+  notesField.disabled = false;
+}
+
+validateBtn.addEventListener("click", async function () {
+  const orderId = validateInput.value.trim();
+
+  validationMessage.textContent = "";
+  validationMessage.className = "validation-message";
+  returnMessage.textContent = "";
+  returnMessage.className = "return-message";
+
+  if (!orderId) {
+    validationMessage.textContent = "Enter an order ID first.";
+    validationMessage.classList.add("error");
+    lockReturnForm();
+    return;
+  }
+
+  try {
+    const response = await fetch("/validate_return_order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ order_id: orderId })
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.status === "Success") {
+      validationMessage.textContent = result.message || "Order validated.";
+      validationMessage.classList.add("success");
+
+      if (!result.items || result.items.length === 0) {
+        validationMessage.textContent = "This order has no returnable items left.";
+        validationMessage.className = "validation-message error";
+        lockReturnForm();
+        return;
+      }
+
+      unlockReturnForm(orderId, result.items);
+    } else {
+      validationMessage.textContent = result.message || "Order could not be validated.";
+      validationMessage.classList.add("error");
+      lockReturnForm();
+    }
+  } catch (error) {
+    validationMessage.textContent = "Validation failed. Try again.";
+    validationMessage.classList.add("error");
+    lockReturnForm();
+  }
+});
+
+productField.addEventListener("change", function () {
+  const selected = productField.options[productField.selectedIndex];
+
+  if (!selected || !selected.dataset.maxQty) {
+    quantityField.value = 1;
+    quantityField.removeAttribute("max");
+    return;
+  }
+
+  quantityField.max = selected.dataset.maxQty;
+  quantityField.value = 1;
+});
+
+returnForm.addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  returnMessage.textContent = "";
+  returnMessage.className = "return-message";
+
+  const selected = productField.options[productField.selectedIndex];
+  const maxQty = Number(selected?.dataset?.maxQty || 1);
+
+  const payload = {
+    order_id: orderIdField.value.trim(),
+    product_name: productField.value.trim(),
+    quantity: Number(quantityField.value),
+    reason: reasonField.value,
+    notes: notesField.value.trim()
+  };
+
+  if (!payload.order_id || !payload.product_name || !payload.reason) {
+    returnMessage.textContent = "Complete all required return fields.";
+    returnMessage.classList.add("error");
+    return;
+  }
+
+  if (payload.quantity <= 0 || payload.quantity > maxQty) {
+    returnMessage.textContent = `Quantity must be between 1 and ${maxQty}.`;
+    returnMessage.classList.add("error");
+    return;
+  }
+
+  try {
+    const response = await fetch("/process_return", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.status === "Success") {
+      returnMessage.textContent = result.message || "Return submitted successfully.";
+      returnMessage.classList.add("success");
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } else {
+      returnMessage.textContent = result.message || "Unable to submit return.";
+      returnMessage.classList.add("error");
+    }
+  } catch (error) {
+    returnMessage.textContent = "Something went wrong while submitting the return.";
+    returnMessage.classList.add("error");
+  }
+});
+
+lockReturnForm();
+</script>
+
+</body>
+</html>

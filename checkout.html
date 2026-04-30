@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout — Packify</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+
+<body>
+
+<nav class="site-nav">
+  <a href="{{ url_for('root') }}" class="nav-logo">PACK<span>ify</span></a>
+
+  <div class="nav-links">
+    <a href="{{ url_for('root') }}">Home</a>
+    <a href="{{ url_for('products') }}">Shop</a>
+    <a href="{{ url_for('order_list') }}">Orders</a>
+    <a href="{{ url_for('settlement') }}">Warehouse</a>
+    <a href="{{ url_for('inventory') }}">Inventory</a>
+    <a href="{{ url_for('returns') }}">Returns</a>
+  </div>
+
+  <a href="{{ url_for('cart') }}" class="cart-btn">
+    🛍 Cart <span class="cart-count">0</span>
+  </a>
+</nav>
+
+<header class="page-header">
+  <div class="page-header-inner">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('products') }}">Shop</a>
+      <span class="breadcrumb-sep">/</span>
+      <span>Checkout</span>
+    </nav>
+    <h1>Checkout</h1>
+    <p>Secure payment — your information is protected</p>
+  </div>
+</header>
+
+<div class="checkout-container">
+  <div class="checkout-grid">
+
+    <div class="checkout-form-col">
+      <form id="checkout-form">
+
+        <div class="form-card">
+          <h3>Shipping Information</h3>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="first-name">First Name</label>
+              <input type="text" id="first-name" name="firstName" placeholder="Emma" autocomplete="given-name">
+            </div>
+
+            <div class="form-group">
+              <label for="last-name">Last Name</label>
+              <input type="text" id="last-name" name="lastName" placeholder="Johnson" autocomplete="family-name">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="address">Address</label>
+            <input type="text" id="address" name="address" placeholder="1000 Chastain Rd, Kennesaw, GA 30144" autocomplete="street-address">
+          </div>
+        </div>
+
+        <div class="form-card" style="margin-top:1.5rem;">
+          <h3>Payment Details</h3>
+
+          <div class="form-group">
+            <label for="card-number">Card Number</label>
+            <input type="text" id="card-number" name="cardNumber" placeholder="•••• •••• •••• ••••" maxlength="19" inputmode="numeric" autocomplete="cc-number">
+
+            <small id="card-type-display"></small>
+            <small id="masked-card-display"></small>
+
+            <span class="error-msg" id="card-error"></span>
+          </div>
+
+          <div class="form-row three-col">
+            <div class="form-group">
+              <label for="month">Month</label>
+              <input type="text" id="month" name="month" placeholder="MM" maxlength="2" inputmode="numeric">
+              <span class="error-msg" id="month-error"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="year">Year</label>
+              <input type="text" id="year" name="year" placeholder="YY" maxlength="2" inputmode="numeric">
+              <span class="error-msg" id="year-error"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="cvv">CVV</label>
+              <input type="password" id="cvv" name="cvv" placeholder="•••" maxlength="4" inputmode="numeric">
+              <span class="error-msg" id="cvv-error"></span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="zip">ZIP Code</label>
+            <input type="text" id="zip" name="zip" placeholder="30144" maxlength="5" inputmode="numeric">
+            <span class="error-msg" id="zip-error"></span>
+          </div>
+
+          <div id="message-area"></div>
+
+          <button type="submit" class="btn-primary btn-full" style="margin-top:1rem;">
+            Place Order
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="order-summary-card">
+      <h3>Order Summary</h3>
+
+      <div id="summary-items-list" class="summary-items-list"></div>
+
+      <div class="summary-totals-block">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="checkout-subtotal">$0.00</span>
+        </div>
+
+        <div class="summary-row muted">
+          <span>Tax (8%)</span>
+          <span id="checkout-tax">$0.00</span>
+        </div>
+
+        <div class="summary-row total-row">
+          <span>Total</span>
+          <span id="total-amount" class="amount">$0.00</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-logo">PACK<span>ify</span></div>
+    <p class="footer-tagline">Curated backpacks for every journey.</p>
+    <p class="footer-copy">&copy; 2025 Packify. All rights reserved. &middot; Built for KSU students.</p>
+  </div>
+</footer>
+
+<script>
+  function getCheckoutCartItems() {
+    const cart = localStorage.getItem("cart");
+    const parsed = cart ? JSON.parse(cart) : [];
+
+    return parsed.map(item => ({
+      name: item.name,
+      price: Number(item.price),
+      quantity: Number(item.quantity ?? item.qty ?? 1)
+    }));
+  }
+
+  function updateCartCount() {
+    const items = getCheckoutCartItems();
+    const count = items.reduce((sum, item) => sum + item.quantity, 0);
+
+    document.querySelectorAll(".cart-count").forEach(el => {
+      el.textContent = count;
+    });
+  }
+
+  function renderCheckoutSummary() {
+    const items = getCheckoutCartItems();
+
+    const itemsList = document.getElementById("summary-items-list");
+    const subtotalEl = document.getElementById("checkout-subtotal");
+    const taxEl = document.getElementById("checkout-tax");
+    const totalEl = document.getElementById("total-amount");
+
+    if (!itemsList || !subtotalEl || !taxEl || !totalEl) {
+      console.error("Checkout summary elements not found.");
+      return;
+    }
+
+    if (items.length === 0) {
+      itemsList.innerHTML = `
+        <p class="empty-bag">
+          Your bag is empty. <a href="{{ url_for('products') }}">Go back to Shop</a>
+        </p>
+      `;
+      subtotalEl.textContent = "$0.00";
+      taxEl.textContent = "$0.00";
+      totalEl.textContent = "$0.00";
+      updateCartCount();
+      return;
+    }
+
+    let subtotal = 0;
+
+    itemsList.innerHTML = items.map(item => {
+      const lineTotal = item.price * item.quantity;
+      subtotal += lineTotal;
+
+      return `
+        <div class="summary-item">
+          <span class="item-name">${item.name} × ${item.quantity}</span>
+          <span class="item-price">$${lineTotal.toFixed(2)}</span>
+        </div>
+      `;
+    }).join("");
+
+    const tax = subtotal * 0.08;
+    const total = subtotal + tax;
+
+    subtotalEl.textContent = "$" + subtotal.toFixed(2);
+    taxEl.textContent = "$" + tax.toFixed(2);
+    totalEl.textContent = "$" + total.toFixed(2);
+
+    updateCartCount();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    renderCheckoutSummary();
+
+    const cardInput = document.getElementById("card-number");
+
+    if (cardInput) {
+      cardInput.addEventListener("input", function () {
+        let v = this.value.replace(/\D/g, "").substring(0, 16);
+        this.value = v.replace(/(.{4})/g, "$1 ").trim();
+      });
+    }
+  });
+</script>
+
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
+
+</body>
+</html>
